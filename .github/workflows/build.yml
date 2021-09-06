@@ -1,0 +1,120 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_linux64:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux2014_x86_64
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly-2021-08-31
+        target: x86_64-unknown-linux-gnu
+        default: true
+        override: true
+    - name: Build 64-bit
+      run: cargo build --release --target x86_64-unknown-linux-gnu
+    - name: Strip debug symbols
+      run: |
+        strip target/x86_64-unknown-linux-gnu/release/libgm_async_write.so
+    - name: Rename binaries
+      run: |
+        mv target/x86_64-unknown-linux-gnu/release/libgm_async_write.so target/x86_64-unknown-linux-gnu/release/gmsv_async_write_linux64.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/x86_64-unknown-linux-gnu/release/gmsv_async_write_linux64.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_linux32:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux2014_x86_64
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install build dependencies
+      run: yum -y install glibc-devel.i686 libgcc.i686
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly-2021-08-31
+        target: i686-unknown-linux-gnu
+        default: true
+        override: true
+    - name: Build 32-bit
+      run: cargo build --release --target i686-unknown-linux-gnu
+    - name: Strip debug symbols
+      run: |
+        strip target/i686-unknown-linux-gnu/release/libgm_async_write.so
+    - name: Rename binaries
+      run: |
+        mv target/i686-unknown-linux-gnu/release/libgm_async_write.so target/i686-unknown-linux-gnu/release/gmsv_async_write_linux.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/i686-unknown-linux-gnu/release/gmsv_async_write_linux.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_windows64:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly-2021-08-31
+        target: x86_64-pc-windows-msvc
+        default: true
+        override: true
+    - name: Build 64-bit
+      run: cargo build --release --target x86_64-pc-windows-msvc
+    - name: Rename binaries
+      run: |
+        mv target/x86_64-pc-windows-msvc/release/gm_async_write.dll target/x86_64-pc-windows-msvc/release/gmsv_async_write_win64.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/x86_64-pc-windows-msvc/release/gmsv_async_write_win64.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_windows32:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly-2021-08-31
+        target: i686-pc-windows-msvc
+        default: true
+        override: true
+    - name: Build 32-bit
+      run: cargo build --release --target i686-pc-windows-msvc
+    - name: Rename binaries
+      run: |
+        mv target/i686-pc-windows-msvc/release/gm_async_write.dll target/i686-pc-windows-msvc/release/gmsv_async_write_win32.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/i686-pc-windows-msvc/release/gmsv_async_write_win32.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

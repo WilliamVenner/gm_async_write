@@ -1,0 +1,20 @@
+[package]
+name = "gm_async_write"
+version = "0.1.0"
+authors = ["William Venner <william@venner.io>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = 'thin'
+codegen-units = 1
+opt-level = "z"
+
+[dependencies]
+tokio = { version = "1.11.0", features = ["macros", "rt", "fs", "io-util", "sync", "rt-multi-thread"] }
+cstr = "0.2.8"
+libloading = "0.7.0"
+lazy_static = "1.4.0"
+path-clean = "0.1.0"
