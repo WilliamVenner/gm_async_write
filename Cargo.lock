@@ -32,7 +32,7 @@ dependencies = [
 
 [[package]]
 name = "gm_async_write"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cstr",
  "lazy_static",

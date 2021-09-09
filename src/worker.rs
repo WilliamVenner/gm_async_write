@@ -1,6 +1,6 @@
 use crate::{
 	fs::FSASYNC,
-	lua::{self, LuaInt, LuaReference, LUA_REGISTRYINDEX},
+	lua::{self, LuaReference, LUA_REGISTRYINDEX},
 	util,
 };
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
@@ -18,9 +18,10 @@ lazy_static! {
 }
 static CALLBACKS_PENDING: AtomicUsize = AtomicUsize::new(0);
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[must_use]
 pub struct Job {
+	pub raw_path: String,
 	pub path: PathBuf,
 	pub data: Vec<u8>,
 	pub callback: Option<LuaReference>,
@@ -121,7 +122,7 @@ fn deafen(lua: lua::State) {
 		lua.pop();
 	}
 }
-unsafe extern "C-unwind" fn poll(lua: lua::State) -> LuaInt {
+unsafe extern "C-unwind" fn poll(lua: lua::State) -> i32 {
 	let mut recv = 0;
 	match CALLBACK_QUEUE.1.try_recv() {
 		Ok(job) => {
@@ -130,8 +131,8 @@ unsafe extern "C-unwind" fn poll(lua: lua::State) -> LuaInt {
 			let callback = job.callback.unwrap_unchecked();
 			lua.raw_geti(LUA_REGISTRYINDEX, callback);
 			lua.dereference(callback);
-			lua.push_string(job.path.to_string_lossy().as_ref());
-			lua.push_integer(job.result.unwrap_unchecked() as LuaInt);
+			lua.push_string(&job.raw_path);
+			lua.push_integer(job.result.unwrap_unchecked() as _);
 			lua.call(2, 0);
 		}
 		Err(std::sync::mpsc::TryRecvError::Empty) => {}

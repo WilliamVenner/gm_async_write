@@ -1,5 +1,5 @@
 use crate::{
-	lua::{self, LuaInt, LuaReference},
+	lua::{self, LuaReference},
 	whitelist,
 	worker::{self, Job},
 };
@@ -35,10 +35,33 @@ impl From<ErrorKind> for FSASYNC {
 	}
 }
 
+pub fn validate_path<S: AsRef<str>>(file_name: S) -> Option<PathBuf> {
+	let file_name = file_name.as_ref();
+
+	if file_name.ends_with(|char| char == '/' || char == '\\') {
+		dbg!("Invalid (ends with slash)");
+		return None;
+	}
+
+	let path = PathBuf::from(format!("garrysmod/data/{}", file_name)).clean();
+	dbg!("Path: {:?}", path);
+	if path.starts_with("garrysmod/data") && !path.is_dir() && whitelist::check(&path) {
+		Some(path)
+	} else {
+		dbg!(
+			"Invalid {} {} {}",
+			path.starts_with("garrysmod/data"),
+			!path.is_dir(),
+			whitelist::check(&path)
+		);
+		None
+	}
+}
+
 #[inline]
 unsafe fn digest_args<'a>(
 	lua: &'a lua::State
-) -> Option<(PathBuf, &'a [u8], Option<LuaReference>, bool)> {
+) -> Option<(String, PathBuf, &'a [u8], Option<LuaReference>, bool)> {
 	let file_name = lua.check_string(1);
 	let data = lua.check_binary_string(2);
 	let sync = lua.to_boolean(4);
@@ -54,33 +77,20 @@ unsafe fn digest_args<'a>(
 		}
 	};
 
-	if file_name.ends_with(|char| char == '/' || char == '\\') {
-		dbg!("Invalid (ends with slash)");
-		return None;
-	}
-
-	let path = PathBuf::from(format!("garrysmod/data/{}", file_name)).clean();
-	dbg!("Path: {:?}", path);
-	if path.starts_with("garrysmod/data") && !path.is_dir() && whitelist::check(&path) {
-		Some((path, data, callback, sync))
+	if let Some(path) = validate_path(file_name.as_ref()) {
+		Some((file_name.into_owned(), path, data, callback, sync))
 	} else {
-		dbg!(
-			"Invalid {} {} {}",
-			path.starts_with("garrysmod/data"),
-			!path.is_dir(),
-			whitelist::check(&path)
-		);
 		None
 	}
 }
 
-pub unsafe extern "C-unwind" fn async_write(lua: lua::State) -> LuaInt {
+pub unsafe extern "C-unwind" fn async_write(lua: lua::State) -> i32 {
 	use std::io::Write;
 
-	let (path, data, callback, sync) = match digest_args(&lua) {
+	let (raw_path, path, data, callback, sync) = match digest_args(&lua) {
 		Some(args) => args,
 		None => {
-			lua.push_integer(FSASYNC::FSASYNC_ERR_FILEOPEN as LuaInt);
+			lua.push_integer(FSASYNC::FSASYNC_ERR_FILEOPEN as _);
 			return 1;
 		}
 	};
@@ -98,34 +108,35 @@ pub unsafe extern "C-unwind" fn async_write(lua: lua::State) -> LuaInt {
 
 		if let Some(_) = callback {
 			lua.push_value(3);
-			lua.push_string(path.to_string_lossy().as_ref());
-			lua.push_integer(result as LuaInt);
+			lua.push_string(&raw_path);
+			lua.push_integer(result as _);
 			lua.call(2, 0);
 		}
 	} else {
 		worker::job(
 			lua,
 			Job {
+				raw_path,
 				path,
 				data: data.to_vec(),
 				callback,
 				append: false,
-				..Default::default()
+				result: None
 			},
 		);
 	}
 
-	lua.push_integer(FSASYNC::FSASYNC_OK as LuaInt);
+	lua.push_integer(FSASYNC::FSASYNC_OK as _);
 	1
 }
 
-pub unsafe extern "C-unwind" fn async_append(lua: lua::State) -> LuaInt {
+pub unsafe extern "C-unwind" fn async_append(lua: lua::State) -> i32 {
 	use std::io::Write;
 
-	let (path, data, callback, sync) = match digest_args(&lua) {
+	let (raw_path, path, data, callback, sync) = match digest_args(&lua) {
 		Some(args) => args,
 		None => {
-			lua.push_integer(FSASYNC::FSASYNC_ERR_FILEOPEN as LuaInt);
+			lua.push_integer(FSASYNC::FSASYNC_ERR_FILEOPEN as _);
 			return 1;
 		}
 	};
@@ -144,19 +155,20 @@ pub unsafe extern "C-unwind" fn async_append(lua: lua::State) -> LuaInt {
 
 		if let Some(_) = callback {
 			lua.push_value(3);
-			lua.push_string(path.to_string_lossy().as_ref());
-			lua.push_integer(result as LuaInt);
+			lua.push_string(&raw_path);
+			lua.push_integer(result as _);
 			lua.call(2, 0);
 		}
 	} else {
 		worker::job(
 			lua,
 			Job {
+				raw_path,
 				path,
 				data: data.to_vec(),
 				callback,
 				append: true,
-				..Default::default()
+				result: None
 			},
 		);
 	}
