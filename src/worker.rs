@@ -14,7 +14,7 @@ lazy_static! {
 		tx
 	};
 
-	pub(super) static ref CALLBACK_QUEUE: util::UnsafeSync<(std::sync::mpsc::Sender<Job>, std::sync::mpsc::Receiver<Job>)> =util::UnsafeSync(std::sync::mpsc::channel());
+	pub(super) static ref CALLBACK_QUEUE: util::UnsafeSync<(std::sync::mpsc::Sender<Job>, std::sync::mpsc::Receiver<Job>)> = util::UnsafeSync(std::sync::mpsc::channel());
 }
 static CALLBACKS_PENDING: AtomicUsize = AtomicUsize::new(0);
 
@@ -35,7 +35,26 @@ pub fn job(lua: lua::State, job: Job) {
 		listen(lua);
 		CALLBACKS_PENDING.fetch_add(1, std::sync::atomic::Ordering::Release);
 	}
-	JOB_QUEUE.send(job).unwrap();
+
+	if let Err(job) = JOB_QUEUE.send(job) {
+		let job = job.0;
+
+		// At this point the Tokio runtime has already been shut down,
+		// so let's quickly create a new one to process these jobs.
+		let rt = match tokio::runtime::Builder::new_current_thread()
+			.worker_threads(1)
+			.max_blocking_threads(1)
+			.build()
+		{
+			Ok(rt) => rt,
+			Err(_) => {
+				eprintln!("[gm_async_write] Couldn't process job: {:?}", job);
+				return;
+			}
+		};
+
+		rt.block_on(process_job(job));
+	}
 }
 
 async fn process_job(mut job: Job) {

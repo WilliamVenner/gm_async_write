@@ -1,5 +1,4 @@
 #![feature(c_unwind)]
-#![feature(option_result_unwrap_unchecked)]
 
 #[macro_use]
 extern crate lazy_static;
