@@ -18,6 +18,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
+        toolchain: stable
         target: x86_64-unknown-linux-gnu
         default: true
         override: true
@@ -48,6 +49,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
+        toolchain: stable
         target: i686-unknown-linux-gnu
         default: true
         override: true
@@ -75,6 +77,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
+        toolchain: stable
         target: x86_64-pc-windows-msvc
         default: true
         override: true
@@ -99,6 +102,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
+        toolchain: stable
         target: i686-pc-windows-msvc
         default: true
         override: true
